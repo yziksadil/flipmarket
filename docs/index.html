@@ -12,8 +12,6 @@
 @media(max-width:900px){.nav{gap:15px;padding:0 4%;height:68px}.navlinks{gap:12px}.navlinks a{font-size:12px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.photo{height:220px}}
 @media(max-width:650px){.topbar{font-size:10px}.nav{height:auto;min-height:66px;flex-wrap:wrap;padding:13px 5%;gap:12px}.logo{font-size:23px}.search{order:3;flex-basis:100%;max-width:none}.search input{padding-top:11px;padding-bottom:11px}.navlinks{margin-left:auto}.navlinks a{display:none}.sell-btn{padding:10px 15px;font-size:12px}.hero{grid-template-columns:1fr;margin-top:18px;min-height:0}.hero-copy{padding:35px 27px 25px}.hero h1{font-size:49px}.hero-art{min-height:210px}.art-card{width:145px;height:170px;font-size:23px}.art-sticker{width:72px;height:72px;font-size:11px}.categories{margin-top:25px}.section{margin-top:35px}.section h2{font-size:25px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}.photo{height:clamp(145px,48vw,220px)}.photo .emoji{font-size:65px}.section-head{align-items:center}.sort{max-width:125px}.footer{align-items:flex-start;flex-direction:column}.notice{max-width:none}}
 </style>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="topbar">A fresh way to find pre-loved favourites · Made for the UK</div>
@@ -43,8 +41,12 @@
 <script>
 const SUPABASE_URL = "https://xwyztauygamcnuhinojv.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_knEVk4pmYV68ts5j7NEbVQ_JoFfbdYX";
-window.flipMarketSupabase = window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
-const supabase = window.flipMarketSupabase;
+let supabase = null;
+const supabaseReady = import("https://esm.sh/@supabase/supabase-js@2").then(({createClient}) => {
+  supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  window.flipMarketSupabase = supabase;
+  return supabase;
+}).catch(error => { console.error("FlipMarket account service failed to load:", error); return null; });
 const starter=[
 {name:"Everyday trainers",price:28,category:"Fashion",emoji:"👟",tag:"Popular",place:"Manchester"},
 {name:"Wireless headphones",price:35,category:"Tech",emoji:"🎧",tag:"Great find",place:"London"},
@@ -61,8 +63,8 @@ function toast(message){const t=document.getElementById("toast");t.textContent=m
 function accountStatus(message,type=""){const el=document.getElementById("accountStatus");el.textContent=message;el.className="account-status show"+(type?" "+type:"")}
 function render(){let q=search.value.trim().toLowerCase();let items=listings.filter(x=>(category==="All"||x.category===category)&&x.name.toLowerCase().includes(q));if(sort.value==="low")items.sort((a,b)=>a.price-b.price);if(sort.value==="high")items.sort((a,b)=>b.price-a.price);grid.innerHTML="";if(!items.length){grid.innerHTML='<div class="empty">No finds match that search yet. Try another search or category.</div>';return}items.forEach((x)=>{let index=listings.indexOf(x),card=document.createElement("article");card.className="product";card.innerHTML='<div class="photo"><span class="emoji" aria-hidden="true">'+(x.emoji||"📦")+'</span>'+(x.tag?'<span class="tag">'+escapeHtml(x.tag)+'</span>':'')+'<button class="heart '+(saved.has(index)?'saved':'')+'" aria-label="Save '+escapeHtml(x.name)+'" aria-pressed="'+saved.has(index)+'">'+(saved.has(index)?'♥':'♡')+'</button></div><h3>'+escapeHtml(x.name)+'</h3><div class="price">£'+Number(x.price).toFixed(2)+'</div><div class="meta">'+escapeHtml(x.category)+' · '+escapeHtml(x.place||"UK")+'</div>';card.querySelector(".heart").addEventListener("click",()=>{saved.has(index)?saved.delete(index):saved.add(index);render()});grid.appendChild(card)})}
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-async function loadListings(){if(!supabase){render();return}try{const {data,error}=await supabase.from("listings").select("id,title,price,category,location,status,created_at").eq("status","active").order("created_at",{ascending:false});if(error)throw error;const live=(data||[]).map(x=>({id:x.id,name:x.title,price:Number(x.price),category:x.category,emoji:"📦",tag:"Community listing",place:x.location||"UK"}));listings=[...live,...starter];render()}catch(error){console.error("FlipMarket listings:",error);toast("Could not load community listings yet. Showing demo finds.")}}
-async function refreshUser(){if(!supabase){currentUser=null;document.getElementById("accountBtn").textContent="Log in";return}const {data}=await supabase.auth.getSession();currentUser=data.session?.user||null;document.getElementById("accountBtn").textContent=currentUser?"Log out":"Log in"}
+async function loadListings(){const client=await supabaseReady;if(!client){render();return}try{const {data,error}=await client.from("listings").select("id,title,price,category,location,status,created_at").eq("status","active").order("created_at",{ascending:false});if(error)throw error;const live=(data||[]).map(x=>({id:x.id,name:x.title,price:Number(x.price),category:x.category,emoji:"📦",tag:"Community listing",place:x.location||"UK"}));listings=[...live,...starter];render()}catch(error){console.error("FlipMarket listings:",error);toast("Could not load community listings yet. Showing demo finds.")}}
+async function refreshUser(){const client=await supabaseReady;if(!client){currentUser=null;document.getElementById("accountBtn").textContent="Log in";return}const {data}=await client.auth.getSession();currentUser=data.session?.user||null;document.getElementById("accountBtn").textContent=currentUser?"Log out":"Log in"}
 document.getElementById("categories").addEventListener("click",e=>{let b=e.target.closest("[data-category]");if(!b)return;category=b.dataset.category;document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("active",x===b));render()});
 search.addEventListener("input",render);sort.addEventListener("change",render);
 const modal=document.getElementById("sellModal"),accountModal=document.getElementById("accountModal");
@@ -72,44 +74,11 @@ modal.addEventListener("click",e=>{if(e.target===modal)modal.classList.remove("o
 document.getElementById("accountBtn").addEventListener("click",()=>{if(currentUser&&supabase){supabase.auth.signOut().then(({error})=>{if(error)toast(error.message);else{currentUser=null;document.getElementById("accountBtn").textContent="Log in";toast("You are logged out.")}});return}accountModal.classList.add("open")});
 document.getElementById("closeAccount").addEventListener("click",()=>accountModal.classList.remove("open"));
 accountModal.addEventListener("click",e=>{if(e.target===accountModal)accountModal.classList.remove("open")});
-window.flipMarketLogin=async function(e){if(e)e.preventDefault();const email=document.getElementById("accountEmail").value.trim(),password=document.getElementById("accountPassword").value;accountStatus("Logging in…");if(!supabase){accountStatus("The login service did not load. Please refresh the page and try again.","error");return false}try{const {error}=await supabase.auth.signInWithPassword({email,password});if(error){accountStatus(error.message,"error");return false}accountModal.classList.remove("open");await refreshUser();toast("You're logged in.")}catch(error){console.error("FlipMarket login:",error);accountStatus(error.message||"Login failed. Please try again.","error")}return false};
-window.flipMarketSignUp=async function(){const email=document.getElementById("accountEmail").value.trim(),password=document.getElementById("accountPassword").value;if(!email||password.length<8){accountStatus("Enter your email and a password of at least 8 characters.","error");return}if(!supabase){accountStatus("The account service did not load. Please refresh the page and try again.","error");return}const btn=document.getElementById("signUpBtn");btn.disabled=true;btn.textContent="Creating…";accountStatus("Creating your account…");try{const {data,error}=await supabase.auth.signUp({email,password});if(error){accountStatus(error.message,"error");return}if(data.session){accountStatus("Your account is ready. Logging you in…","success");accountModal.classList.remove("open");await refreshUser();toast("Your account is ready.")}else{accountStatus("Account request sent. Check your email for a confirmation message, then come back and log in.","success")}}catch(error){console.error("FlipMarket sign-up:",error);accountStatus(error.message||"We could not reach the account service. Please try again.","error")}finally{btn.disabled=false;btn.textContent="Create account"}};
+window.flipMarketLogin=async function(e){if(e)e.preventDefault();const email=document.getElementById("accountEmail").value.trim(),password=document.getElementById("accountPassword").value;accountStatus("Connecting to account service…");const client=await supabaseReady;if(!client){accountStatus("The account service could not load. Check your connection and try again.","error");return false}try{const {error}=await client.auth.signInWithPassword({email,password});if(error){accountStatus(error.message,"error");return false}accountModal.classList.remove("open");await refreshUser();toast("You're logged in.")}catch(error){console.error("FlipMarket login:",error);accountStatus(error.message||"Login failed. Please try again.","error")}return false};
+window.flipMarketSignUp=async function(){const email=document.getElementById("accountEmail").value.trim(),password=document.getElementById("accountPassword").value;if(!email||password.length<8){accountStatus("Enter your email and a password of at least 8 characters.","error");return}const btn=document.getElementById("signUpBtn");btn.disabled=true;btn.textContent="Creating…";accountStatus("Connecting to account service…");try{const client=await supabaseReady;if(!client){accountStatus("The account service could not load. Check your connection and try again.","error");return}accountStatus("Creating your account…");const {data,error}=await client.auth.signUp({email,password});if(error){accountStatus(error.message,"error");return}if(data.session){accountStatus("Your account is ready. Logging you in…","success");accountModal.classList.remove("open");await refreshUser();toast("Your account is ready.")}else{accountStatus("Account request sent. Check your email for a confirmation message, then come back and log in.","success")}}catch(error){console.error("FlipMarket sign-up:",error);accountStatus(error.message||"We could not reach the account service. Please try again.","error")}finally{btn.disabled=false;btn.textContent="Create account"}};
 document.getElementById("sellForm").addEventListener("submit",async e=>{e.preventDefault();await refreshUser();if(!currentUser){toast("Please log in first.");return}const title=document.getElementById("itemName").value.trim(),price=Number(document.getElementById("itemPrice").value),categoryValue=document.getElementById("itemCategory").value;const {error}=await supabase.from("listings").insert({seller_id:currentUser.id,title,price,category:categoryValue,status:"active"});if(error){toast("Couldn't save listing: "+error.message);return}category="All";document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("active",x.dataset.category==="All"));search.value="";modal.classList.remove("open");e.target.reset();await loadListings();toast("Your listing has been saved.")});
-if(supabase)supabase.auth.onAuthStateChange(()=>{refreshUser()});
-(async()=>{await refreshUser();await loadListings()})();
+supabaseReady.then(client=>{if(client){client.auth.onAuthStateChange(()=>{refreshUser()});refreshUser();loadListings()}else{render();}});
 </script>
 
-<script>
-/* Direct, visible account actions with clear browser alerts. */
-(function(){
- function showMsg(message,type){var el=document.getElementById("accountStatus");if(el){el.textContent=message;el.className="account-status show"+(type?" "+type:"");}}
- window.flipMarketSignUp=async function(){
-  var btn=document.getElementById("signUpBtn");
-  var email=document.getElementById("accountEmail").value.trim();
-  var password=document.getElementById("accountPassword").value;
-  btn.disabled=true;btn.textContent="Working…";
-  if(!email||password.length<8){var msg="Enter your email and a password of at least 8 characters.";showMsg(msg,"error");alert(msg);btn.disabled=false;btn.textContent="Create account";return;}
-  var client=window.flipMarketSupabase;
-  if(!client){var msg="FlipMarket could not connect to its account service. Please try refreshing.";showMsg(msg,"error");alert(msg);btn.disabled=false;btn.textContent="Create account";return;}
-  showMsg("Contacting the account service…");
-  try{
-   var result=await client.auth.signUp({email:email,password:password});
-   if(result.error){showMsg(result.error.message,"error");alert("FlipMarket: "+result.error.message);return;}
-   if(result.data.session){showMsg("Your account has been created.","success");alert("Your FlipMarket account has been created!");document.getElementById("accountModal").classList.remove("open");var loginBtn=document.getElementById("accountBtn");if(loginBtn)loginBtn.textContent="Log out";}
-   else{var msg="Your sign-up request was sent. Check your email for a confirmation link, then log in.";showMsg(msg,"success");alert(msg);}
-  }catch(err){var msg=err&&err.message?err.message:"Could not contact the account service.";showMsg(msg,"error");alert("FlipMarket: "+msg);}
-  finally{btn.disabled=false;btn.textContent="Create account";}
- };
- window.flipMarketLogin=async function(event){
-  if(event)event.preventDefault();
-  var email=document.getElementById("accountEmail").value.trim(),password=document.getElementById("accountPassword").value,client=window.flipMarketSupabase;
-  if(!client){var msg="FlipMarket could not connect to its account service.";showMsg(msg,"error");alert(msg);return false;}
-  showMsg("Checking your login…");
-  try{var result=await client.auth.signInWithPassword({email:email,password:password});if(result.error){showMsg(result.error.message,"error");alert("FlipMarket: "+result.error.message);return false;}document.getElementById("accountModal").classList.remove("open");var b=document.getElementById("accountBtn");if(b)b.textContent="Log out";alert("You are logged in to FlipMarket.");}
-  catch(err){var msg=err&&err.message?err.message:"Login failed.";showMsg(msg,"error");alert("FlipMarket: "+msg);}
-  return false;
- };
-})();
-</script>
 </body>
 </html>
