@@ -42,7 +42,8 @@
 <script>
 const SUPABASE_URL = "https://xwyztauygamcnuhinojv.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_knEVk4pmYV68ts5j7NEbVQ_JoFfbdYX";
-const supabase = window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
+window.flipMarketSupabase = window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
+const supabase = window.flipMarketSupabase;
 const starter=[
 {name:"Everyday trainers",price:28,category:"Fashion",emoji:"👟",tag:"Popular",place:"Manchester"},
 {name:"Wireless headphones",price:35,category:"Tech",emoji:"🎧",tag:"Great find",place:"London"},
@@ -75,6 +76,33 @@ window.flipMarketSignUp=async function(){const email=document.getElementById("ac
 document.getElementById("sellForm").addEventListener("submit",async e=>{e.preventDefault();await refreshUser();if(!currentUser){toast("Please log in first.");return}const title=document.getElementById("itemName").value.trim(),price=Number(document.getElementById("itemPrice").value),categoryValue=document.getElementById("itemCategory").value;const {error}=await supabase.from("listings").insert({seller_id:currentUser.id,title,price,category:categoryValue,status:"active"});if(error){toast("Couldn't save listing: "+error.message);return}category="All";document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("active",x.dataset.category==="All"));search.value="";modal.classList.remove("open");e.target.reset();await loadListings();toast("Your listing has been saved.")});
 if(supabase)supabase.auth.onAuthStateChange(()=>{refreshUser()});
 (async()=>{await refreshUser();await loadListings()})();
+</script>
+
+<script>
+/* Independent account handlers: keep sign-up and login working even if another page feature has an error. */
+(function(){
+  function showAccountMessage(message,type){var el=document.getElementById("accountStatus");if(!el)return;el.textContent=message;el.className="account-status show"+(type?" "+type:"");}
+  window.flipMarketSignUp=async function(){
+    var email=document.getElementById("accountEmail").value.trim();
+    var password=document.getElementById("accountPassword").value;
+    var btn=document.getElementById("signUpBtn");
+    if(!email||password.length<8){showAccountMessage("Enter your email and a password of at least 8 characters.","error");return;}
+    var client=window.flipMarketSupabase;
+    if(!client){showAccountMessage("The account connection did not load. Please refresh and try again.","error");return;}
+    btn.disabled=true;btn.textContent="Creating…";showAccountMessage("Creating your account…");
+    try{var result=await client.auth.signUp({email:email,password:password});if(result.error){showAccountMessage(result.error.message,"error");return;}if(result.data.session){document.getElementById("accountModal").classList.remove("open");var b=document.getElementById("accountBtn");if(b)b.textContent="Log out";showAccountMessage("Your account is ready.","success");}else{showAccountMessage("Account request sent. Check your email for a confirmation message, then log in.","success");}}
+    catch(err){showAccountMessage(err&&err.message?err.message:"Could not contact the account service. Please try again.","error");}
+    finally{btn.disabled=false;btn.textContent="Create account";}
+  };
+  window.flipMarketLogin=async function(event){if(event)event.preventDefault();
+    var email=document.getElementById("accountEmail").value.trim();var password=document.getElementById("accountPassword").value;var client=window.flipMarketSupabase;
+    if(!client){showAccountMessage("The account connection did not load. Please refresh and try again.","error");return false;}
+    showAccountMessage("Logging in…");
+    try{var result=await client.auth.signInWithPassword({email:email,password:password});if(result.error){showAccountMessage(result.error.message,"error");return false;}document.getElementById("accountModal").classList.remove("open");var b=document.getElementById("accountBtn");if(b)b.textContent="Log out";showAccountMessage("You are logged in.","success");}
+    catch(err){showAccountMessage(err&&err.message?err.message:"Login failed. Please try again.","error");}
+    return false;
+  };
+})();
 </script>
 </body>
 </html>
