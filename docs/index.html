@@ -79,29 +79,35 @@ if(supabase)supabase.auth.onAuthStateChange(()=>{refreshUser()});
 </script>
 
 <script>
-/* Independent account handlers: keep sign-up and login working even if another page feature has an error. */
+/* Direct, visible account actions with clear browser alerts. */
 (function(){
-  function showAccountMessage(message,type){var el=document.getElementById("accountStatus");if(!el)return;el.textContent=message;el.className="account-status show"+(type?" "+type:"");}
-  window.flipMarketSignUp=async function(){
-    var email=document.getElementById("accountEmail").value.trim();
-    var password=document.getElementById("accountPassword").value;
-    var btn=document.getElementById("signUpBtn");
-    if(!email||password.length<8){showAccountMessage("Enter your email and a password of at least 8 characters.","error");return;}
-    var client=window.flipMarketSupabase;
-    if(!client){showAccountMessage("The account connection did not load. Please refresh and try again.","error");return;}
-    btn.disabled=true;btn.textContent="Creating…";showAccountMessage("Creating your account…");
-    try{var result=await client.auth.signUp({email:email,password:password});if(result.error){showAccountMessage(result.error.message,"error");return;}if(result.data.session){document.getElementById("accountModal").classList.remove("open");var b=document.getElementById("accountBtn");if(b)b.textContent="Log out";showAccountMessage("Your account is ready.","success");}else{showAccountMessage("Account request sent. Check your email for a confirmation message, then log in.","success");}}
-    catch(err){showAccountMessage(err&&err.message?err.message:"Could not contact the account service. Please try again.","error");}
-    finally{btn.disabled=false;btn.textContent="Create account";}
-  };
-  window.flipMarketLogin=async function(event){if(event)event.preventDefault();
-    var email=document.getElementById("accountEmail").value.trim();var password=document.getElementById("accountPassword").value;var client=window.flipMarketSupabase;
-    if(!client){showAccountMessage("The account connection did not load. Please refresh and try again.","error");return false;}
-    showAccountMessage("Logging in…");
-    try{var result=await client.auth.signInWithPassword({email:email,password:password});if(result.error){showAccountMessage(result.error.message,"error");return false;}document.getElementById("accountModal").classList.remove("open");var b=document.getElementById("accountBtn");if(b)b.textContent="Log out";showAccountMessage("You are logged in.","success");}
-    catch(err){showAccountMessage(err&&err.message?err.message:"Login failed. Please try again.","error");}
-    return false;
-  };
+ function showMsg(message,type){var el=document.getElementById("accountStatus");if(el){el.textContent=message;el.className="account-status show"+(type?" "+type:"");}}
+ window.flipMarketSignUp=async function(){
+  var btn=document.getElementById("signUpBtn");
+  var email=document.getElementById("accountEmail").value.trim();
+  var password=document.getElementById("accountPassword").value;
+  btn.disabled=true;btn.textContent="Working…";
+  if(!email||password.length<8){var msg="Enter your email and a password of at least 8 characters.";showMsg(msg,"error");alert(msg);btn.disabled=false;btn.textContent="Create account";return;}
+  var client=window.flipMarketSupabase;
+  if(!client){var msg="FlipMarket could not connect to its account service. Please try refreshing.";showMsg(msg,"error");alert(msg);btn.disabled=false;btn.textContent="Create account";return;}
+  showMsg("Contacting the account service…");
+  try{
+   var result=await client.auth.signUp({email:email,password:password});
+   if(result.error){showMsg(result.error.message,"error");alert("FlipMarket: "+result.error.message);return;}
+   if(result.data.session){showMsg("Your account has been created.","success");alert("Your FlipMarket account has been created!");document.getElementById("accountModal").classList.remove("open");var loginBtn=document.getElementById("accountBtn");if(loginBtn)loginBtn.textContent="Log out";}
+   else{var msg="Your sign-up request was sent. Check your email for a confirmation link, then log in.";showMsg(msg,"success");alert(msg);}
+  }catch(err){var msg=err&&err.message?err.message:"Could not contact the account service.";showMsg(msg,"error");alert("FlipMarket: "+msg);}
+  finally{btn.disabled=false;btn.textContent="Create account";}
+ };
+ window.flipMarketLogin=async function(event){
+  if(event)event.preventDefault();
+  var email=document.getElementById("accountEmail").value.trim(),password=document.getElementById("accountPassword").value,client=window.flipMarketSupabase;
+  if(!client){var msg="FlipMarket could not connect to its account service.";showMsg(msg,"error");alert(msg);return false;}
+  showMsg("Checking your login…");
+  try{var result=await client.auth.signInWithPassword({email:email,password:password});if(result.error){showMsg(result.error.message,"error");alert("FlipMarket: "+result.error.message);return false;}document.getElementById("accountModal").classList.remove("open");var b=document.getElementById("accountBtn");if(b)b.textContent="Log out";alert("You are logged in to FlipMarket.");}
+  catch(err){var msg=err&&err.message?err.message:"Login failed.";showMsg(msg,"error");alert("FlipMarket: "+msg);}
+  return false;
+ };
 })();
 </script>
 </body>
